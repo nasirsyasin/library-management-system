@@ -1,0 +1,134 @@
+{
+  "id": "0db8262f-1a1f-4e8c-9c81-7c484b4a9624",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.author": {
+      "name": "author",
+      "schema": "",
+      "columns": {
+        "authorId": {
+          "name": "authorId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.book": {
+      "name": "book",
+      "schema": "",
+      "columns": {
+        "bookId": {
+          "name": "bookId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isbn": {
+          "name": "isbn",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalCopies": {
+          "name": "totalCopies",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "availableCopies": {
+          "name": "availableCopies",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "authorAuthorId": {
+          "name": "authorAuthorId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "book_isbn_uq": {
+          "name": "book_isbn_uq",
+          "columns": [
+            {
+              "expression": "isbn",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "book_authorAuthorId_author_authorId_fk": {
+          "name": "book_authorAuthorId_author_authorId_fk",
+          "tableFrom": "book",
+          "tableTo": "author",
+          "columnsFrom": [
+            "authorAuthorId"
+          ],
+          "columnsTo": [
+            "authorId"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "book_total_copies_nonnegative": {
+          "name": "book_total_copies_nonnegative",
+          "value": "\"book\".\"totalCopies\" >= 0"
+        },
+        "book_available_copies_valid": {
+          "name": "book_available_copies_valid",
+          "value": "\"book\".\"availableCopies\" >= 0 AND \"book\".\"availableCopies\" <= \"book\".\"totalCopies\""
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

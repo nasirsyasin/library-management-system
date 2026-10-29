@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: library-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: library-secrets
+          env:
+            - name: GATEWAY_DB_HOST
+              value: identity-db
+            - name: GATEWAY_DB_PORT
+              value: "5432"
+            - name: GATEWAY_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: IDENTITY_DB_NAME
+            - name: GATEWAY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: IDENTITY_DB_USER
+            - name: GATEWAY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: IDENTITY_DB_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3

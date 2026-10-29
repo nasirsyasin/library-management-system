@@ -1,0 +1,191 @@
+{
+  "id": "495eeeb7-96aa-4f8a-9d66-b3180dda7e39",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.notification": {
+      "name": "notification",
+      "schema": "",
+      "columns": {
+        "notificationId": {
+          "name": "notificationId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "memberId": {
+          "name": "memberId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sentDate": {
+          "name": "sentDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read": {
+          "name": "read",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "notification_member_sent_idx": {
+          "name": "notification_member_sent_idx",
+          "columns": [
+            {
+              "expression": "memberId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sentDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reservation": {
+      "name": "reservation",
+      "schema": "",
+      "columns": {
+        "reservationId": {
+          "name": "reservationId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "memberId": {
+          "name": "memberId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bookId": {
+          "name": "bookId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requestDate": {
+          "name": "requestDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'waiting'"
+        }
+      },
+      "indexes": {
+        "reservation_book_queue_idx": {
+          "name": "reservation_book_queue_idx",
+          "columns": [
+            {
+              "expression": "bookId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requestDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "reservationId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reservation_member_request_idx": {
+          "name": "reservation_member_request_idx",
+          "columns": [
+            {
+              "expression": "memberId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requestDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "reservation_status_valid": {
+          "name": "reservation_status_valid",
+          "value": "\"reservation\".\"status\" IN ('waiting', 'ready', 'fulfilled', 'cancelled')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

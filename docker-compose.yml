@@ -1,0 +1,177 @@
+services:
+  # ---------- Databases (one per service) ----------
+  catalog-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${CATALOG_DB_NAME}
+      POSTGRES_USER: ${CATALOG_DB_USER}
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD}
+    volumes:
+      - catalog-db-data:/var/lib/postgresql/data
+    ports:
+      - "${CATALOG_DB_LOCAL_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [library-net]
+
+  borrow-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${BORROW_DB_NAME}
+      POSTGRES_USER: ${BORROW_DB_USER}
+      POSTGRES_PASSWORD: ${BORROW_DB_PASSWORD}
+    volumes:
+      - borrow-db-data:/var/lib/postgresql/data
+    ports:
+      - "${BORROW_DB_LOCAL_PORT:-15433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [library-net]
+
+  reservation-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${RESERVATION_DB_NAME}
+      POSTGRES_USER: ${RESERVATION_DB_USER}
+      POSTGRES_PASSWORD: ${RESERVATION_DB_PASSWORD}
+    volumes:
+      - reservation-db-data:/var/lib/postgresql/data
+    ports:
+      - "${RESERVATION_DB_LOCAL_PORT:-15434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [library-net]
+
+  identity-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${IDENTITY_DB_NAME:?Set IDENTITY_DB_NAME in .env}
+      POSTGRES_USER: ${IDENTITY_DB_USER:?Set IDENTITY_DB_USER in .env}
+      POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
+    volumes:
+      - identity-db-data:/var/lib/postgresql/data
+    ports:
+      - "${IDENTITY_DB_LOCAL_PORT:-15435}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [library-net]
+
+  # ---------- Domain microservices ----------
+  catalog-service:
+    build: ./services/catalog-service
+    env_file: .env
+    environment:
+      PORT: 8081
+      DB_HOST: ${CATALOG_DB_HOST}
+      DB_PORT: ${CATALOG_DB_PORT}
+      DB_NAME: ${CATALOG_DB_NAME}
+      DB_USER: ${CATALOG_DB_USER}
+      DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      DATABASE_URL: ""
+      CATALOG_DATABASE_URL: ""
+      BORROW_SERVICE_URL: http://borrow-service:8082
+      RESERVATION_SERVICE_URL: http://reservation-service:8083
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    networks: [library-net]
+
+  borrow-service:
+    build: ./services/borrow-service
+    env_file: .env
+    environment:
+      PORT: 8082
+      DB_HOST: ${BORROW_DB_HOST}
+      DB_PORT: ${BORROW_DB_PORT}
+      DB_NAME: ${BORROW_DB_NAME}
+      DB_USER: ${BORROW_DB_USER}
+      DB_PASSWORD: ${BORROW_DB_PASSWORD}
+      DATABASE_URL: ""
+      BORROW_DATABASE_URL: ""
+      CATALOG_SERVICE_URL: http://catalog-service:8081
+    depends_on:
+      borrow-db:
+        condition: service_healthy
+    networks: [library-net]
+
+  reservation-service:
+    build: ./services/reservation-service
+    env_file: .env
+    environment:
+      PORT: 8083
+      API_GATEWAY_URL: http://api-gateway:8080
+      CATALOG_SERVICE_URL: http://catalog-service:8081
+      DB_HOST: ${RESERVATION_DB_HOST}
+      DB_PORT: ${RESERVATION_DB_PORT}
+      DB_NAME: ${RESERVATION_DB_NAME}
+      DB_USER: ${RESERVATION_DB_USER}
+      DB_PASSWORD: ${RESERVATION_DB_PASSWORD}
+      DATABASE_URL: ""
+      RESERVATION_DATABASE_URL: ""
+    depends_on:
+      reservation-db:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+      borrow-service:
+        condition: service_started
+    networks: [library-net]
+
+  # ---------- Gateway / ingress ----------
+  api-gateway:
+    build: ./api-gateway
+    env_file: .env
+    environment:
+      PORT: 8080
+      GATEWAY_DATABASE_URL: ""
+      GATEWAY_DB_HOST: identity-db
+      GATEWAY_DB_PORT: 5432
+      GATEWAY_DB_NAME: ${IDENTITY_DB_NAME:?Set IDENTITY_DB_NAME in .env}
+      GATEWAY_DB_USER: ${IDENTITY_DB_USER:?Set IDENTITY_DB_USER in .env}
+      GATEWAY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Library Administrator}
+    ports:
+      - "8080:8080"
+    depends_on:
+      catalog-service:
+        condition: service_started
+      borrow-service:
+        condition: service_started
+      reservation-service:
+        condition: service_started
+      identity-db:
+        condition: service_healthy
+    networks: [library-net]
+
+  # ---------- Frontend ----------
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on: [api-gateway]
+    networks: [library-net]
+
+networks:
+  library-net:
+
+volumes:
+  catalog-db-data:
+  borrow-db-data:
+  reservation-db-data:
+  identity-db-data:

@@ -1,0 +1,48 @@
+{
+  "name": "library-management-system",
+  "version": "0.1.0",
+  "description": "Library Management System - Microservices Architecture",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "api-gateway",
+    "services/catalog-service",
+    "services/borrow-service",
+    "services/reservation-service"
+  ],
+  "scripts": {
+    "build": "npm run build -ws",
+    "dev": "npm run dev -ws",
+    "frontend": "npm run dev --workspace=frontend",
+    "gateway": "npm run start --workspace=api-gateway",
+    "catalog": "npm run start --workspace=services/catalog-service",
+    "borrow": "npm run start --workspace=services/borrow-service",
+    "reservation": "npm run start --workspace=services/reservation-service",
+    "db:generate": "npm run db:generate --workspace=services/catalog-service && npm run db:generate --workspace=services/borrow-service && npm run db:generate --workspace=services/reservation-service",
+    "db:migrate": "npm run build --workspace=services/catalog-service && npm run build --workspace=services/borrow-service && npm run build --workspace=services/reservation-service && npm run db:migrate --workspace=services/catalog-service && npm run db:migrate --workspace=services/borrow-service && npm run db:migrate --workspace=services/reservation-service",
+    "db:studio": "npm run db:studio --workspace=services/catalog-service",
+    "db:pull": "npm run db:pull --workspace=services/catalog-service && npm run db:pull --workspace=services/borrow-service && npm run db:pull --workspace=services/reservation-service",
+    "db:seed": "npm run build --workspace=services/catalog-service && npm run db:seed --workspace=services/catalog-service",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "lint": "npm run build -ws --if-present"
+  },
+  "keywords": [
+    "library",
+    "management",
+    "microservices",
+    "typescript",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "drizzle-orm": "^0.45.4"
+  },
+  "overrides": {
+    "express": {
+      "qs": "6.16.2"
+    }
+  }
+}

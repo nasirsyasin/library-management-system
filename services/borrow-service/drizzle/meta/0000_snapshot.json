@@ -1,0 +1,124 @@
+{
+  "id": "93af61b7-b9a3-4564-87b4-503225a2b72c",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.borrow": {
+      "name": "borrow",
+      "schema": "",
+      "columns": {
+        "borrowId": {
+          "name": "borrowId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "memberId": {
+          "name": "memberId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bookId": {
+          "name": "bookId",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "borrowDate": {
+          "name": "borrowDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dueDate": {
+          "name": "dueDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "returnDate": {
+          "name": "returnDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "borrow_member_id_idx": {
+          "name": "borrow_member_id_idx",
+          "columns": [
+            {
+              "expression": "memberId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "borrow_book_id_idx": {
+          "name": "borrow_book_id_idx",
+          "columns": [
+            {
+              "expression": "bookId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "borrow_due_date_idx": {
+          "name": "borrow_due_date_idx",
+          "columns": [
+            {
+              "expression": "dueDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "borrow_due_after_borrow": {
+          "name": "borrow_due_after_borrow",
+          "value": "\"borrow\".\"dueDate\" >= \"borrow\".\"borrowDate\""
+        },
+        "borrow_return_after_borrow": {
+          "name": "borrow_return_after_borrow",
+          "value": "\"borrow\".\"returnDate\" IS NULL OR \"borrow\".\"returnDate\" >= \"borrow\".\"borrowDate\""
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

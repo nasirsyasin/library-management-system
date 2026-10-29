@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+.env
+k8s/secrets.yaml
+*.log
+.DS_Store

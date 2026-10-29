@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792857350348,
+      "tag": "0000_mixed_loa",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792858389017,
+      "tag": "0001_smooth_tempest",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793196625967,
+      "tag": "0002_supreme_the_hunter",
+      "breakpoints": true
+    }
+  ]
+}
