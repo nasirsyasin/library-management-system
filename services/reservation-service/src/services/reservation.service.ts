@@ -1,5 +1,4 @@
 import axios from "axios";
-import jwt from "jsonwebtoken";
 import {
   cancelReservation,
   findBookQueue,
@@ -14,6 +13,7 @@ import {
   restoreReadyReservation,
 } from "../repositories/reservation.repository";
 import { assertBookIsActive } from "./catalog.client";
+import { issueServiceToken } from "../middleware/auth.middleware";
 
 export const ReservationService = {
   create: async (memberId: string, bookId: string) => {
@@ -60,11 +60,7 @@ export const ReservationService = {
     const result = await notifyNextReservation(bookId);
     if (!result) return null;
 
-    const serviceToken = jwt.sign(
-      { service: "reservation-service" },
-      process.env.JWT_SECRET || "change-me",
-      { expiresIn: "1m" },
-    );
+    const serviceToken = issueServiceToken("reservation-service");
     try {
       await axios.post(
         `${process.env.API_GATEWAY_URL || "http://localhost:8080"}/internal/book-returned`,

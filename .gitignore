@@ -3,5 +3,6 @@ dist/
 build/
 .env
 k8s/secrets.yaml
+k8s/minikube-demo-secrets.yaml
 *.log
 .DS_Store

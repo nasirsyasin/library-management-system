@@ -104,17 +104,13 @@ Copy the example environment file and replace the placeholder secrets:
 cp .env.example .env
 ```
 
-For local services started with npm, the service-specific `*_DATABASE_URL`
-values connect to `127.0.0.1` on ports 15432 (Catalog), 15433 (Borrow), and
-15434 (Reservation). Alternatively, Drizzle Kit builds each service connection
-from its corresponding `*_DB_*` variables in the root `.env`, translating
-Compose hostnames to `127.0.0.1` and using host ports 15432 (Catalog), 15433
-(Borrow), and 15434 (Reservation) when Studio runs on your computer. These
-ports avoid conflicts with locally installed PostgreSQL servers. To use a
-single database instead, set `DATABASE_URL` for the service being run. Compose
-containers connect to their PostgreSQL service names, not `localhost`.
-URL-encode special characters in database usernames and passwords used in
-connection URLs.
+For local services started with npm, the `*_DB_*` settings in `.env` connect
+to the Compose-published host ports 15432 (Catalog), 15433 (Borrow), 15434
+(Reservation), and 15435 (Identity). The service code and Drizzle Kit translate
+the Docker DNS names to `127.0.0.1` for host-run processes. Compose containers
+instead use Docker DNS names and container port 5432. To use a single database
+for an individual service, set its `DATABASE_URL` (or its service-specific
+`*_DATABASE_URL`) explicitly.
 
 Start the databases only:
 
@@ -167,26 +163,117 @@ match the existing tables and JavaScript `Date` model.
 Back up important databases before applying schema changes.
 
 ### Option 1: Docker Compose (Recommended for full system)
+
+Docker Compose runs published Docker Hub images; it does not build application
+images on the installing computer. The release pipeline publishes these five
+public repositories:
+
+- `nasirsyasin/library-management-frontend`
+- `nasirsyasin/library-management-api-gateway`
+- `nasirsyasin/library-management-catalog-service`
+- `nasirsyasin/library-management-borrow-service`
+- `nasirsyasin/library-management-reservation-service`
+
+#### Prerequisites
+
+- Docker Engine/Desktop with the Docker Compose plugin
+- Git
+- Network access to Docker Hub
+
+#### Install and configure
+
+Clone the GitLab distribution repository (replace the path with the project's
+actual GitLab group/project):
+
 ```bash
+git clone https://gitlab.com/<group>/<project>.git
+cd <project>
 cp .env.example .env
-docker compose up --build
 ```
 
-- Frontend:        http://localhost:3000
-- API Gateway:      http://localhost:8080
-- Catalog Service:  http://localhost:8081 (internal, via gateway in prod)
-- Borrow Service:   http://localhost:8082 (internal, via gateway in prod)
-- Reservation Svc:  http://localhost:8083 (internal, via gateway in prod)
+Edit `.env` before startup:
 
-Domain-service startup scripts apply pending migrations before accepting
-requests. The database containers expose ports 15432, 15433, and 15434 for local
-database clients.
+1. Set four unique database passwords (`*_DB_PASSWORD`).
+2. Set `JWT_SECRET` to a cryptographically random value of at least 32
+   characters. Generate one with `openssl rand -hex 32`; do not commit it.
+3. Set `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` (12–128 characters,
+   uppercase, lowercase, and a number). This provisions the initial librarian
+   only when that email does not already exist.
+4. Keep `DOCKERHUB_NAMESPACE=nasirsyasin`. Use a commit hash in `IMAGE_TAG` to
+   pin a particular published version; `latest` selects the latest `main`
+   release.
+
+The variables in `.env.example` are blank placeholders where credentials are
+required. Compose fails early rather than booting with an empty password or
+JWT secret.
+
+#### Pull, start, verify
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose ps
+curl -fsS http://localhost:8080/health
+curl -fsS http://localhost:8080/ready
+```
+
+Open the frontend at <http://localhost:3000>. Sign in with the configured
+librarian account or register a member and approve the registration as a
+librarian. The Gateway health and readiness endpoints should return JSON with
+an `ok` or `ready` status. `docker compose ps` should show the application and
+four database containers as healthy.
+
+Domain services and the Gateway apply their own pending Drizzle migrations
+during startup, after their database is healthy. No source checkout or local
+application image build is needed for this installation; only the Compose
+file and configured `.env` are used.
+
+#### Logs, shutdown and database persistence
+
+```bash
+docker compose logs -f
+docker compose logs --tail=100 api-gateway catalog-service borrow-service reservation-service
+docker compose down
+```
+
+`docker compose down` stops and removes containers/network but **preserves**
+all four named database volumes. On the next start, the same data is reused.
+To back up a database:
+
+```bash
+docker compose exec -T catalog-db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > catalog-backup.sql
+```
+
+Do not use `docker compose down -v` unless you deliberately want to delete all
+Compose database volumes and their data. Keep backups outside the repository
+and do not commit them.
+
+#### Troubleshooting
+
+- **Compose reports a missing variable:** Complete the required `.env`
+  settings; Compose requires non-empty DB passwords, administrator credentials,
+  and `JWT_SECRET`.
+- **Image pull denied/not found:** Confirm the five Hub repositories are
+  public, the namespace is `nasirsyasin`, and the selected `IMAGE_TAG` exists.
+  Run `docker compose pull` again after the CI publish job succeeds.
+- **Port already allocated:** Stop the local process using 3000 or 8080, or
+  adjust the published host port and matching Gateway CORS/frontend build
+  configuration.
+- **A service is unhealthy:** Use `docker compose logs <service>` and check
+  that its database is healthy. Each service runs its migration during startup.
+- **Login fails after changing the admin environment values:** The bootstrap
+  account is created only once; changing `.env` does not reset an existing
+  account password. Use the documented interactive admin reset command.
+
+Databases are only published to the host loopback interface on ports 15432
+through 15435 for local database tools. Application containers connect to
+database/service names on the private Compose network.
 
 ### Option 2: Local Development (npm workspaces)
 
 Install all dependencies:
 ```bash
-npm install
+npm ci
 ```
 
 Build all services:
@@ -222,15 +309,14 @@ npm run borrow
 npm run reservation
 ```
 
-### Option 3: Kubernetes
+### Option 3: Kubernetes / Minikube
 
-The manifests in `k8s/` are for the existing `library-system` namespace and
-Docker Desktop Kubernetes. For the complete Docker Desktop deployment
-procedure, including private Secret setup, local image builds, and port
-forwarding, see [Docker Desktop Kubernetes deployment](#docker-desktop-kubernetes-update)
-below. Do not apply `k8s/secrets.example.yaml` as a live Secret: it contains
-placeholders. Apply the private `k8s/secrets.yaml` only after replacing them
-with local values, and never commit that file.
+The reduced demo is in `k8s/minikube-demo.yaml` and deploys to the isolated
+`library-demo` namespace. It uses the same published images and has no
+Ingress/load balancer or high-availability replicas. Its four demo databases
+have dedicated PVCs. Do not apply these demo resources to the existing
+`library-system` namespace; the older manifests there are a separate existing
+deployment and some database Deployments do not yet have PVCs.
 
 ### Member registration and administrator approval
 
@@ -252,8 +338,8 @@ already belongs to another account.
 
 The identity schema migration is generated and applied like the other
 Drizzle-managed schemas. Gateway startup applies it before accepting traffic.
-For local development, set `GATEWAY_DATABASE_URL` in `.env`; for containers,
-Compose supplies the private `identity-db` service settings.
+For local development, set the `IDENTITY_DB_*` values and use the host port
+15435; Compose supplies the private `identity-db` service settings.
 
 To reset an existing account password, connect the local gateway database
 (for Kubernetes, forward the identity database port and configure
@@ -294,155 +380,161 @@ npm run build --workspace=frontend
 npm test --workspace=frontend
 ```
 
-#### Docker Compose update
+### GitLab and Docker Hub publishing
 
-After setting real, unique database credentials and a strong `JWT_SECRET` and
-administrator password in `.env` (do not use the example placeholders):
+The GitHub source repository remains the canonical source (`main`). The
+GitLab project is the distribution/CI copy; keep its remote separate rather
+than replacing GitHub's `origin`. The `.gitlab-ci.yml` pipeline runs the
+workspace build and tests, then builds and pushes five Docker Hub images.
+The Node service images compile in a build stage and include production
+dependencies only in their runtime stage.
 
-```bash
-docker compose build api-gateway frontend
-docker compose up -d identity-db
-docker compose run --rm --no-deps api-gateway npm run db:migrate
-docker compose up -d api-gateway frontend
-docker compose logs --tail=100 api-gateway identity-db
+Create these five **public** repositories in the Docker Hub namespace
+`nasirsyasin`:
+
+```text
+library-management-frontend
+library-management-api-gateway
+library-management-catalog-service
+library-management-borrow-service
+library-management-reservation-service
 ```
 
-For catalog deletion, rebuild the affected service images and apply the additive
-catalog migration before serving requests:
+In the GitLab project, add CI/CD variables:
+
+| Variable | Value | Protection |
+|---|---|---|
+| `DOCKERHUB_USERNAME` | Docker Hub account used to authenticate | Mask if GitLab permits |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with read/write permission to the five repositories | Masked and protected |
+| `DOCKERHUB_NAMESPACE` | `nasirsyasin` (already the pipeline default) | Unmasked |
+| `RELEASE_BRANCH` | `main` (the current release branch) | Unmasked |
+| `FRONTEND_API_BASE_URL` | `http://localhost:8080` for the published local Compose/Minikube demo | Unmasked |
+
+Never put a Docker Hub password/token in the repository or in `.env.example`.
+Protect `main` and the publish token in GitLab. The pipeline publishes an
+immutable full Git commit SHA tag on the default branch and Git tags. It pushes
+`latest` only when the commit branch equals `RELEASE_BRANCH` (default `main`);
+tag pipelines do not move `latest`. Docker Hub must be public so a colleague
+can pull without credentials.
+
+After creating the GitLab project, push the source without changing the
+existing GitHub remote:
 
 ```bash
-docker compose build catalog-service borrow-service reservation-service frontend
-docker compose up -d catalog-db borrow-db reservation-db
-docker compose run --rm --no-deps catalog-service node dist/db/migrate.js
-docker compose up -d catalog-service borrow-service reservation-service frontend
-docker compose logs --tail=100 catalog-service borrow-service reservation-service frontend
+git remote add gitlab https://gitlab.com/<group>/<project>.git
+git push gitlab main
 ```
 
-The migration adds only `book.archivedAt`; it does not reset existing volumes
-or remove book, borrow, or reservation records.
+If GitLab is configured as a mirror/import instead, use that workflow and
+confirm the pipeline runs on the GitLab default branch. The `origin` remote
+continues to point to GitHub.
 
-#### Docker Desktop Kubernetes update
-
-Create/update `library-secrets` with non-example values before applying the
-database manifests. For a first local deployment, copy the example and replace
-every placeholder privately (do not commit the resulting Secret):
+For manual publication from a trusted development machine, first authenticate
+interactively using a Docker Hub access token when prompted; do not put the
+token in a command argument:
 
 ```bash
-cp k8s/secrets.example.yaml k8s/secrets.yaml
-# Edit k8s/secrets.yaml with strong, unique credentials and a 32+ character JWT_SECRET.
+docker login --username nasirsyasin
+TAG=$(git rev-parse HEAD)
+docker build -t docker.io/nasirsyasin/library-management-api-gateway:$TAG ./api-gateway
+docker build -t docker.io/nasirsyasin/library-management-catalog-service:$TAG ./services/catalog-service
+docker build -t docker.io/nasirsyasin/library-management-borrow-service:$TAG ./services/borrow-service
+docker build -t docker.io/nasirsyasin/library-management-reservation-service:$TAG ./services/reservation-service
+docker build --build-arg VITE_API_BASE_URL=http://localhost:8080 -t docker.io/nasirsyasin/library-management-frontend:$TAG ./frontend
+docker push docker.io/nasirsyasin/library-management-api-gateway:$TAG
+docker push docker.io/nasirsyasin/library-management-catalog-service:$TAG
+docker push docker.io/nasirsyasin/library-management-borrow-service:$TAG
+docker push docker.io/nasirsyasin/library-management-reservation-service:$TAG
+docker push docker.io/nasirsyasin/library-management-frontend:$TAG
 ```
 
-Include the existing `CATALOG_DB_*`, `BORROW_DB_*`,
-`RESERVATION_DB_*` keys plus `IDENTITY_DB_NAME`, `IDENTITY_DB_USER`,
-`IDENTITY_DB_PASSWORD`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and
-`ADMIN_NAME`. Do not commit the generated Secret or its credentials.
+Only from the `main` release branch, the same images may additionally be
+tagged and pushed as `latest`. The manual commands are:
 
 ```bash
-kubectl apply -f k8s/namespace.yaml
-# Apply the privately populated library-secrets Secret before the databases.
-kubectl apply -f k8s/secrets.yaml
-kubectl apply -f k8s/databases.yaml
-kubectl rollout status deployment/catalog-db -n library-system
-kubectl rollout status deployment/borrow-db -n library-system
-kubectl rollout status deployment/reservation-db -n library-system
-kubectl rollout status deployment/identity-db -n library-system
+test "$(git branch --show-current)" = "main"
+for image in \
+  library-management-api-gateway \
+  library-management-catalog-service \
+  library-management-borrow-service \
+  library-management-reservation-service \
+  library-management-frontend
+do
+  docker tag "docker.io/nasirsyasin/$image:$TAG" "docker.io/nasirsyasin/$image:latest"
+  docker push "docker.io/nasirsyasin/$image:latest"
+done
 ```
 
-For a complete local Docker Desktop deployment, build images into Docker
-Desktop's image store. The frontend API URL is compiled into the frontend
-bundle, so set it to the local Gateway port-forward address:
+Prefer the GitLab pipeline so tests gate publication and tags are consistent.
 
-```bash
-docker build -t api-gateway:latest ./api-gateway
-docker build -t catalog-service:latest ./services/catalog-service
-docker build -t borrow-service:latest ./services/borrow-service
-docker build -t reservation-service:latest ./services/reservation-service
-docker build --build-arg VITE_API_BASE_URL=http://localhost:8081 -t frontend:latest ./frontend
+### Minikube demonstration
 
-kubectl apply -f k8s/api-gateway-service.yaml -f k8s/api-gateway-deployment.yaml
-kubectl apply -f k8s/catalog-service-service.yaml -f k8s/catalog-service-deployment.yaml
-kubectl apply -f k8s/borrow-service-service.yaml -f k8s/borrow-service-deployment.yaml
-kubectl apply -f k8s/reservation-service-service.yaml -f k8s/reservation-service-deployment.yaml
-kubectl apply -f k8s/frontend-service.yaml -f k8s/frontend-deployment.yaml
+The demo is isolated from the existing `library-system` deployment and uses
+PVCs for all four PostgreSQL databases. It pulls the published Docker Hub
+images; it does not build application images locally.
 
-kubectl rollout status deployment/api-gateway -n library-system
-kubectl rollout status deployment/catalog-service -n library-system
-kubectl rollout status deployment/borrow-service -n library-system
-kubectl rollout status deployment/reservation-service -n library-system
-kubectl rollout status deployment/frontend -n library-system
-```
+1. Publish the images using the GitLab pipeline, then install Minikube and
+   start a cluster:
 
-Domain services and the Gateway apply pending Drizzle migrations during
-startup. Check the `kubectl rollout status` results and service logs if any
-pod does not become ready. For later frontend-only changes, rebuild the
-frontend image and restart only its Deployment.
+   ```bash
+   minikube start
+   kubectl config use-context minikube
+   ```
 
-For browser access through port-forwarding, run these in two terminals:
+2. Make a private Kubernetes Secret file. Replace **every** placeholder with
+   a unique DB password, a random `JWT_SECRET` (for example
+   `openssl rand -hex 32`), and an initial administrator account. Do not
+   commit the resulting file:
 
-```bash
-kubectl port-forward svc/frontend 8082:3000 -n library-system
-```
+   ```bash
+   cp k8s/minikube-demo-secrets.example.yaml k8s/minikube-demo-secrets.yaml
+   chmod 600 k8s/minikube-demo-secrets.yaml
+   ```
 
-```bash
-kubectl port-forward svc/api-gateway 8081:8080 -n library-system
-```
+3. Deploy the independent `library-demo` namespace and wait for every
+   database/application rollout:
 
-Open `http://localhost:8082`. The gateway allows that local frontend origin;
-the frontend bundle sends API and Socket.IO requests to `http://localhost:8081`.
-Use an alternate frontend port if `8082` is already occupied; a local process
-already listening on `8080` may prevent the frontend port-forward from binding.
+   ```bash
+   ./scripts/deploy-minikube-demo.sh
+   ```
 
-For an existing cluster, update the book deletion feature with Docker
-Desktop's local image store and distinct tags (non-`latest` tags use
-Kubernetes' default `IfNotPresent` behavior):
+4. In separate terminals, forward the frontend and Gateway. Their local ports
+   match the frontend image's build-time API URL:
 
-```bash
-docker build -t catalog-service:book-delete ./services/catalog-service
-docker build -t borrow-service:book-delete ./services/borrow-service
-docker build -t reservation-service:book-delete ./services/reservation-service
-docker build -t frontend:book-delete ./frontend
-kubectl set image deployment/catalog-service catalog-service=catalog-service:book-delete -n library-system
-kubectl set image deployment/borrow-service borrow-service=borrow-service:book-delete -n library-system
-kubectl set image deployment/reservation-service reservation-service=reservation-service:book-delete -n library-system
-kubectl set image deployment/frontend frontend=frontend:book-delete -n library-system
-kubectl rollout status deployment/catalog-service -n library-system
-kubectl rollout status deployment/borrow-service -n library-system
-kubectl rollout status deployment/reservation-service -n library-system
-kubectl rollout status deployment/frontend -n library-system
-kubectl exec -n library-system deploy/catalog-service -- node dist/db/migrate.js
-```
+   ```bash
+   kubectl port-forward svc/frontend 3000:3000 -n library-demo
+   kubectl port-forward svc/api-gateway 8080:8080 -n library-demo
+   ```
 
-Catalog startup applies the pending Drizzle migration automatically; the
-explicit command is safe to repeat and verifies it completed. The image
-updates are for Catalog (archive/schema and transaction checks), Borrow and
-Reservation (service-only active-transaction lookups), and Frontend (admin
-delete dialog). API Gateway code and deployment configuration do not change;
-its existing authenticated proxy forwards the DELETE request to Catalog.
+   Open <http://localhost:3000>. Verify with
+   `curl -fsS http://localhost:8080/health` and
+   `kubectl get pods,pvc -n library-demo`.
 
-For a schema change, the service image must include the updated `drizzle/`
-directory before its startup migration can apply the change. With Docker
-Desktop Kubernetes, rebuild the affected local image, then restart and verify
-only that service. For example, Borrow applies its pending migration on
-startup:
+No ingress, replica scaling, or monitoring stack is included, keeping the
+demonstration small. `kubectl delete -f k8s/minikube-demo.yaml` is **not** a
+shutdown command: it also deletes PVC objects and may delete demo data. To
+stop while preserving data, scale Deployments to zero and keep the namespace
+and PVCs, or stop Minikube with `minikube stop`. For a disposable demo only,
+remove the namespace after backing up or intentionally discarding the data.
 
-```bash
-docker build -t borrow-service:latest ./services/borrow-service
-kubectl rollout restart deployment/borrow-service -n library-system
-kubectl rollout status deployment/borrow-service -n library-system
-kubectl logs deployment/borrow-service -n library-system
-```
-
-Confirm the new migration appears in `drizzle.__drizzle_migrations` and the
-expected schema is present before considering the migration complete.
+The existing Docker Desktop manifests under `k8s/` still target the
+`library-system` namespace and contain database Deployments that do not all
+mount persistent storage. Do not apply/restart those database manifests as
+part of this isolated Minikube demonstration.
 
 ### Troubleshooting database setup
 
 - **Connection refused:** Check PostgreSQL health and the port/hostname in the
-  service's `*_DATABASE_URL`. Use `localhost` from the host and the Compose
-  database service name from a container.
+  service's database settings. Use `127.0.0.1` with ports 15432–15435 from the
+  host and the Compose database service name on the internal container network.
 - **Authentication/database does not exist:** Verify the matching `*_DB_NAME`,
   `*_DB_USER`, and `*_DB_PASSWORD` values. PostgreSQL only applies changed
   credentials when initializing a new data volume.
+- **Database password changed but authentication still fails:** The official
+  PostgreSQL image uses `POSTGRES_PASSWORD` to initialize a new data directory;
+  changing it does not rotate a password in an existing volume. Use SQL to
+  rotate the DB role password deliberately or restore the documented backup;
+  never delete the volume as a password-reset workaround.
 - **Migration failure:** Run `npm run build` and `npm run db:migrate`; inspect
   the service log for the migration and constraint error. Do not delete a
   database volume to resolve a migration error.
@@ -529,13 +621,13 @@ availability notifications; they require valid service tokens.
 
 | Component | Port | Purpose |
 |---|---:|---|
-| Frontend (Compose) | `3000` | Browser UI |
-| Frontend (Vite dev server) | `5173` | Browser UI during local npm development |
-| API Gateway (Compose/local) | `8080` | Public API, identity, proxy and Socket.IO |
-| Catalog Service | `8081` | Catalog API |
-| Borrow Service | `8082` | Borrow API |
-| Reservation Service | `8083` | Reservation API |
-| PostgreSQL from host | `15432`–`15435` | Catalog, Borrow, Reservation, Identity DBs respectively |
+| Frontend (Compose/Minikube demo) | `3000` | Browser UI |
+| Frontend (Vite development server) | `5173` | Browser UI during local npm development |
+| API Gateway (Compose/Minikube demo) | `8080` | Public API, identity, proxy and Socket.IO |
+| Catalog Service | `8081` | Internal catalog API |
+| Borrow Service | `8082` | Internal borrow API |
+| Reservation Service | `8083` | Internal reservation API |
+| PostgreSQL from Compose host | `15432`–`15435` | Catalog, Borrow, Reservation, Identity DBs respectively; loopback only |
 
 Copy `.env.example` to `.env` for local work. `.env` is private and must not be
 committed. The example contains placeholders only; replace the database
@@ -543,20 +635,20 @@ passwords, administrator password and JWT secret with unique values.
 
 | Variables | Used by |
 |---|---|
-| `CATALOG_DB_HOST`, `CATALOG_DB_PORT`, `CATALOG_DB_LOCAL_PORT`, `CATALOG_DB_NAME`, `CATALOG_DB_USER`, `CATALOG_DB_PASSWORD`, `CATALOG_DATABASE_URL` | Catalog Service, Catalog PostgreSQL, Drizzle Kit |
-| `BORROW_DB_HOST`, `BORROW_DB_PORT`, `BORROW_DB_LOCAL_PORT`, `BORROW_DB_NAME`, `BORROW_DB_USER`, `BORROW_DB_PASSWORD`, `BORROW_DATABASE_URL` | Borrow Service, Borrow PostgreSQL, Drizzle Kit |
-| `RESERVATION_DB_HOST`, `RESERVATION_DB_PORT`, `RESERVATION_DB_LOCAL_PORT`, `RESERVATION_DB_NAME`, `RESERVATION_DB_USER`, `RESERVATION_DB_PASSWORD`, `RESERVATION_DATABASE_URL` | Reservation Service, Reservation PostgreSQL, Drizzle Kit |
-| `IDENTITY_DB_HOST`, `IDENTITY_DB_PORT`, `IDENTITY_DB_LOCAL_PORT`, `IDENTITY_DB_NAME`, `IDENTITY_DB_USER`, `IDENTITY_DB_PASSWORD`, `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USER`, `GATEWAY_DB_PASSWORD`, `GATEWAY_DATABASE_URL` | API Gateway and Identity PostgreSQL |
-| `JWT_SECRET` | API Gateway token signing and service-token verification; use a unique random value of at least 32 characters |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | Optional initial librarian provisioning by the Gateway |
-| `CATALOG_SERVICE_URL`, `BORROW_SERVICE_URL`, `RESERVATION_SERVICE_URL` | Service-to-service REST URLs; use localhost for host-run services and Compose DNS names inside Compose |
+| `DOCKERHUB_NAMESPACE`, `IMAGE_TAG` | Compose selects the published Docker Hub image namespace/tag; defaults are `nasirsyasin` and `latest` |
+| `CATALOG_DB_HOST`, `CATALOG_DB_PORT`, `CATALOG_DB_LOCAL_PORT`, `CATALOG_DB_NAME`, `CATALOG_DB_USER`, `CATALOG_DB_PASSWORD` | Catalog Service, Catalog PostgreSQL, Drizzle Kit |
+| `BORROW_DB_HOST`, `BORROW_DB_PORT`, `BORROW_DB_LOCAL_PORT`, `BORROW_DB_NAME`, `BORROW_DB_USER`, `BORROW_DB_PASSWORD` | Borrow Service, Borrow PostgreSQL, Drizzle Kit |
+| `RESERVATION_DB_HOST`, `RESERVATION_DB_PORT`, `RESERVATION_DB_LOCAL_PORT`, `RESERVATION_DB_NAME`, `RESERVATION_DB_USER`, `RESERVATION_DB_PASSWORD` | Reservation Service, Reservation PostgreSQL, Drizzle Kit |
+| `IDENTITY_DB_HOST`, `IDENTITY_DB_PORT`, `IDENTITY_DB_LOCAL_PORT`, `IDENTITY_DB_NAME`, `IDENTITY_DB_USER`, `IDENTITY_DB_PASSWORD` | API Gateway and Identity PostgreSQL |
+| `JWT_SECRET` | Shared signing/verifying key; API Gateway and all domain services require a unique non-placeholder value of at least 32 characters |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | Initial librarian provisioning by the Gateway; Compose requires email and password |
 | `VITE_API_BASE_URL` | Frontend build-time Gateway URL |
 | `OAUTH_GOOGLE_CLIENT_ID`, `OAUTH_GOOGLE_CLIENT_SECRET`, `OAUTH_GITHUB_CLIENT_ID`, `OAUTH_GITHUB_CLIENT_SECRET` | Reserved optional provider fields in the example environment; OAuth login routes are not currently implemented |
 
-For local npm processes, use the `*_DATABASE_URL` URLs or the host-side
-`*_DB_*` values and published ports. Containers must use database/service DNS
-names, not `localhost`. URL-encode special characters in database credentials
-when placing them in a connection URL.
+Compose and Minikube set service-to-service URLs inside their private networks.
+For local npm processes, configure the `*_DB_*` values and published database
+ports. `DATABASE_URL` and service-specific database URL variables are optional
+overrides. Containers must use database/service DNS names, not `localhost`.
 
 ## Testing
 
@@ -572,12 +664,14 @@ Run tests by workspace:
 npm test --workspace=frontend
 npm test --workspace=api-gateway
 npm test --workspace=services/catalog-service
-npm test --workspace=services/borrow-service
-npm test --workspace=services/reservation-service
+npm test --workspace=services/borrow-service -- --passWithNoTests
+npm test --workspace=services/reservation-service -- --passWithNoTests
 ```
 
 The root `npm run lint` script currently delegates to the workspace TypeScript
-builds; it is not a separate ESLint configuration.
+builds; it is not a separate ESLint configuration. Borrow and Reservation
+currently have no Jest test files, so the `passWithNoTests` flag documents that
+absence while still running each package's test command.
 
 ## Repository layout
 
@@ -603,9 +697,10 @@ library-management-system/
 │       └── Dockerfile
 ├── frontend/                    # React/TypeScript application, tests and Vite config
 │   └── src/features/            # Admin, borrow, catalog, notification, reservation
-├── k8s/                         # Docker Desktop Kubernetes Services/Deployments
+├── k8s/                         # Existing cluster manifests + isolated Minikube demo
 ├── docs/                        # Project review, requirements and diagrams
-├── docker-compose.yml           # Local multi-container system and four DBs
+├── docker-compose.yaml          # Published-image multi-container application + four DBs
+├── .gitlab-ci.yml               # GitLab tests and Docker Hub image publication
 ├── .env.example                 # Local environment template (no real credentials)
 └── package.json                 # npm workspaces and root-level scripts
 ```

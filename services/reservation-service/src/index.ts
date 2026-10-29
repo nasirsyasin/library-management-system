@@ -1,5 +1,6 @@
 import express, { NextFunction, Request, Response } from "express";
 import { applyMigrations, pool, verifyDatabaseConnection } from "./db";
+import { getJwtSecret } from "./middleware/auth.middleware";
 import routes from "./routes";
 
 const app = express();
@@ -16,11 +17,12 @@ const PORT = process.env.PORT || 8083;
 
 async function start(): Promise<void> {
   try {
+    getJwtSecret();
     await applyMigrations();
     await verifyDatabaseConnection();
     app.listen(PORT, () => console.log(`reservation-service listening on port ${PORT}`));
   } catch (error: unknown) {
-    console.error("Reservation service could not initialize its database", error);
+    console.error("Reservation service could not start", error);
     await pool.end();
     process.exitCode = 1;
   }

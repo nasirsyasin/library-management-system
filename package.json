@@ -23,7 +23,7 @@
     "db:studio": "npm run db:studio --workspace=services/catalog-service",
     "db:pull": "npm run db:pull --workspace=services/catalog-service && npm run db:pull --workspace=services/borrow-service && npm run db:pull --workspace=services/reservation-service",
     "db:seed": "npm run build --workspace=services/catalog-service && npm run db:seed --workspace=services/catalog-service",
-    "docker:up": "docker compose up --build",
+    "docker:up": "docker compose pull && docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "lint": "npm run build -ws --if-present"

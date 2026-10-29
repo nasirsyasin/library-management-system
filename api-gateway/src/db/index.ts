@@ -11,15 +11,18 @@ dotenv.config();
 function getDatabaseUrl(): string {
   if (process.env.GATEWAY_DATABASE_URL) return process.env.GATEWAY_DATABASE_URL;
 
-  const { GATEWAY_DB_HOST, GATEWAY_DB_NAME, GATEWAY_DB_PASSWORD, GATEWAY_DB_PORT, GATEWAY_DB_USER } = process.env;
-  if (GATEWAY_DB_HOST && GATEWAY_DB_NAME && GATEWAY_DB_PASSWORD && GATEWAY_DB_USER) {
-    const localPort = process.env.GATEWAY_DB_LOCAL_PORT;
-    const host = localPort && GATEWAY_DB_HOST === "identity-db" ? "127.0.0.1" : GATEWAY_DB_HOST;
-    const port = localPort || GATEWAY_DB_PORT || "5432";
-    return `postgresql://${encodeURIComponent(GATEWAY_DB_USER)}:${encodeURIComponent(GATEWAY_DB_PASSWORD)}@${host}:${port}/${encodeURIComponent(GATEWAY_DB_NAME)}`;
+  const host = process.env.GATEWAY_DB_HOST || process.env.IDENTITY_DB_HOST;
+  const name = process.env.GATEWAY_DB_NAME || process.env.IDENTITY_DB_NAME;
+  const user = process.env.GATEWAY_DB_USER || process.env.IDENTITY_DB_USER;
+  const password = process.env.GATEWAY_DB_PASSWORD || process.env.IDENTITY_DB_PASSWORD;
+  if (host && name && password && user) {
+    const localPort = process.env.GATEWAY_DB_LOCAL_PORT || process.env.IDENTITY_DB_LOCAL_PORT;
+    const dbHost = localPort && host === "identity-db" ? "127.0.0.1" : host;
+    const port = localPort || process.env.GATEWAY_DB_PORT || process.env.IDENTITY_DB_PORT || "5432";
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${dbHost}:${port}/${encodeURIComponent(name)}`;
   }
 
-  throw new Error("Set GATEWAY_DATABASE_URL or GATEWAY_DB_HOST, GATEWAY_DB_NAME, GATEWAY_DB_USER, and GATEWAY_DB_PASSWORD");
+  throw new Error("Set GATEWAY_DATABASE_URL or GATEWAY_DB_*/IDENTITY_DB_* connection variables");
 }
 
 export const pool = new Pool({ connectionString: getDatabaseUrl(), connectionTimeoutMillis: 3000 });

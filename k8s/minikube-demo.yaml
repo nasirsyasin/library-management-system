@@ -1,0 +1,614 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-db-data
+  namespace: library-demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-db
+  namespace: library-demo
+spec:
+  selector:
+    app: catalog-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-db
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-db
+  template:
+    metadata:
+      labels:
+        app: catalog-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: CATALOG_DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: CATALOG_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: CATALOG_DB_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: catalog-db-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: borrow-db-data
+  namespace: library-demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: borrow-db
+  namespace: library-demo
+spec:
+  selector:
+    app: borrow-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: borrow-db
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: borrow-db
+  template:
+    metadata:
+      labels:
+        app: borrow-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: BORROW_DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: BORROW_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: BORROW_DB_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: borrow-db-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reservation-db-data
+  namespace: library-demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reservation-db
+  namespace: library-demo
+spec:
+  selector:
+    app: reservation-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-db
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reservation-db
+  template:
+    metadata:
+      labels:
+        app: reservation-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: RESERVATION_DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: RESERVATION_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: RESERVATION_DB_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: reservation-db-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: identity-db-data
+  namespace: library-demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-db
+  namespace: library-demo
+spec:
+  selector:
+    app: identity-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-db
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-db
+  template:
+    metadata:
+      labels:
+        app: identity-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: IDENTITY_DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: IDENTITY_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: IDENTITY_DB_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: identity-db-data
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16
+          command: ["sh", "-c", "until pg_isready -h catalog-db -p 5432 -U \"$CATALOG_DB_USER\" -d \"$CATALOG_DB_NAME\"; do sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+      containers:
+        - name: catalog-service
+          image: docker.io/nasirsyasin/library-management-catalog-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+          env:
+            - name: PORT
+              value: "8081"
+            - name: CATALOG_DB_HOST
+              value: catalog-db
+            - name: CATALOG_DB_PORT
+              value: "5432"
+            - name: BORROW_SERVICE_URL
+              value: http://borrow-service:8082
+            - name: RESERVATION_SERVICE_URL
+              value: http://reservation-service:8083
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: library-demo
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: borrow-service
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: borrow-service
+  template:
+    metadata:
+      labels:
+        app: borrow-service
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16
+          command: ["sh", "-c", "until pg_isready -h borrow-db -p 5432 -U \"$BORROW_DB_USER\" -d \"$BORROW_DB_NAME\"; do sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+      containers:
+        - name: borrow-service
+          image: docker.io/nasirsyasin/library-management-borrow-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+          env:
+            - name: PORT
+              value: "8082"
+            - name: BORROW_DB_HOST
+              value: borrow-db
+            - name: BORROW_DB_PORT
+              value: "5432"
+            - name: CATALOG_SERVICE_URL
+              value: http://catalog-service:8081
+            - name: RESERVATION_SERVICE_URL
+              value: http://reservation-service:8083
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: borrow-service
+  namespace: library-demo
+spec:
+  selector:
+    app: borrow-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reservation-service
+  template:
+    metadata:
+      labels:
+        app: reservation-service
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16
+          command: ["sh", "-c", "until pg_isready -h reservation-db -p 5432 -U \"$RESERVATION_DB_USER\" -d \"$RESERVATION_DB_NAME\"; do sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+      containers:
+        - name: reservation-service
+          image: docker.io/nasirsyasin/library-management-reservation-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8083
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+          env:
+            - name: PORT
+              value: "8083"
+            - name: RESERVATION_DB_HOST
+              value: reservation-db
+            - name: RESERVATION_DB_PORT
+              value: "5432"
+            - name: API_GATEWAY_URL
+              value: http://api-gateway:8080
+            - name: CATALOG_SERVICE_URL
+              value: http://catalog-service:8081
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reservation-service
+  namespace: library-demo
+spec:
+  selector:
+    app: reservation-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16
+          command: ["sh", "-c", "until pg_isready -h identity-db -p 5432 -U \"$IDENTITY_DB_USER\" -d \"$IDENTITY_DB_NAME\"; do sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+      containers:
+        - name: api-gateway
+          image: docker.io/nasirsyasin/library-management-api-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: library-demo-secrets
+          env:
+            - name: PORT
+              value: "8080"
+            - name: GATEWAY_DB_HOST
+              value: identity-db
+            - name: GATEWAY_DB_PORT
+              value: "5432"
+            - name: GATEWAY_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: IDENTITY_DB_NAME
+            - name: GATEWAY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: IDENTITY_DB_USER
+            - name: GATEWAY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: library-demo-secrets
+                  key: IDENTITY_DB_PASSWORD
+            - name: CATALOG_SERVICE_URL
+              value: http://catalog-service:8081
+            - name: BORROW_SERVICE_URL
+              value: http://borrow-service:8082
+            - name: RESERVATION_SERVICE_URL
+              value: http://reservation-service:8083
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: library-demo
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: library-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: docker.io/nasirsyasin/library-management-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: library-demo
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
